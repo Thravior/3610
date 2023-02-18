@@ -8,10 +8,32 @@
 #ifndef SRC_ROUTEUR_H_EXT_
 #define SRC_ROUTEUR_H_EXT_
 
+#include  <cpu.h>
+#include  <lib_mem.h>
+
 #include <os.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include <stdbool.h>
+
+#include <app_cfg.h>
+#include <cpu.h>
+#include <ucos_bsp.h>
+#include <ucos_int.h>
+#include <xparameters.h>
+#include <KAL/kal.h>
+
+#include <xil_printf.h>
+
+#include  <stdio.h>
+#include  <ucos_bsp.h>
+
+#include <Source/os.h>
+#include <os_cfg_app.h>
+
+#include <xgpio.h>
+#include <xintc.h>
+#include <xil_exception.h>
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
@@ -29,15 +51,6 @@
 #define          TaskResetPRIO     			14
 #define          TaskStopPRIO     			13
 
-// Deuxième assignation de priorites pour repondre a la question no 1
-/*#define          TaskGeneratePRIO   			30
-#define			 TaskStatsPRIO 					12
-#define          TaskComputingPRIO  			25
-#define          TaskForwardingPRIO 		22
-#define          TaskOutputPortPRIO     		20
-#define          TaskResetPRIO     				14
-#define          TaskStopPRIO     				13
-*/
 #define			 WAITFORComputing			6
 
 
@@ -125,6 +138,17 @@ static OS_TCB TaskStopTCB;
 static OS_TCB StartupTaskTCB;
 
 
+
+// Evenements (masques) lies aux ISRs
+#define TASK_RESET_RDY  			0x20	 // Permet le rendez vous unilatéral entre gpio_isr et TaskReset quand on démarre le systeme
+#define TASK_SHUTDOWN				0x40     // Permet le rendez vous unilatéral entre gpio_isr et StartupTask quand on arrête le systeme
+#define TASK_STOP_RDY  				0x80	 // Permet le rendez vous unilatéral entre fittimer et TaskStop après 20 sec
+#define TASK_STATS_PRINT			0x100    // Permet le rendez vous unilatéral entre TaskStop et TaskStats pour imprimer
+
+
+
+
+
 /* ************************************************
  *                  Queues
  **************************************************/
@@ -148,18 +172,6 @@ OS_MUTEX mutAlloc;
 OS_MUTEX mutPrint;
 
 
-/*DECLARATION DES COMPTEURS POUR STATISTIQUES*/
-int nbPacketCrees = 0;								// Nb de packets total crees
-int nbPacketTraites = 0;							// Nb de paquets envoyes sur une interface
-int nbPacketSourceRejeteTotal = 0;					// Nb de packets total rejetés pour mauvaise source
-int nbPacketSourceRejete = 0;						// Nb de packets rejete pour mauvaise source pour 30 sec
-int packet_rejete_fifo_pleine_inputQ = 0;			// Utilisation de la fifo d'entrÃ©e
-int packet_rejete_output_port_plein = 0;			// Utilisation des MB
-int packet_rejete_fifo_pleine_Q = 0;
-int delai_pour_vider_les_fifos_sec = 0;
-int delai_pour_vider_les_fifos_msec = 250;
-int print_paquets_rejetes = 0;
-int limite_de_paquets= 30000;
 
 /* ************************************************
  *              TASK PROTOTYPES

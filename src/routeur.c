@@ -16,34 +16,23 @@
 */
 
 #include "routeur.h"
+#include "interrupts.h"
 
-#include  <cpu.h>
-#include  <lib_mem.h>
 
-#include <os.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-
-#include <app_cfg.h>
-#include <cpu.h>
-#include <ucos_bsp.h>
-#include <ucos_int.h>
-#include <xparameters.h>
-#include <KAL/kal.h>
-
-#include <xil_printf.h>
-
-#include  <stdio.h>
-#include  <ucos_bsp.h>
-
-#include <Source/os.h>
-#include <os_cfg_app.h>
-
-#include <xgpio.h>
-#include <xintc.h>
-#include <xil_exception.h>
-
+/*DECLARATION DES COMPTEURS POUR STATISTIQUES*/
+int nbPacketCrees = 0;								// Nb de packets total crees
+int nbPacketTraites = 0;							// Nb de paquets envoyes sur une interface
+int nbPacketSourceRejeteTotal = 0;					// Nb de packets total rejetés pour mauvaise source
+int nbPacketSourceRejete = 0;						// Nb de packets rejete pour mauvaise source pour 30 sec
+int packet_rejete_fifo_pleine_inputQ = 0;			// Utilisation de la fifo d'entrÃ©e
+int packet_rejete_output_port_plein = 0;			// Utilisation des MB
+int packet_rejete_fifo_pleine_Q = 0;
+int delai_pour_vider_les_fifos_sec = 0;
+int delai_pour_vider_les_fifos_msec = 250;
+int print_paquets_rejetes = 0;
+int limite_de_paquets= 30000;
+int routerIsOn = 0;
+int Stat_Period = 0;
 
 // À utiliser pour suivre le remplissage et le vidage des fifos
 // Mettre en commentaire et utiliser la fonction vide suivante si vous ne voulez pas de trace
@@ -139,7 +128,73 @@ int create_events() {
 //									TASKS
 ///////////////////////////////////////////////////////////////////////////////////////
 
+
+void gpio_isr0(void *p_int_arg, CPU_INT32U source_cpu) {
+	CPU_TS ts;
+	OS_ERR err;
+	OS_FLAGS flags;
+	int button_data = 0;
+	// N.B. Inspirez-vous du no 34 (fig. 4) pour le DiscreteRead et
+	// DiscreteWrite…
+	// On regarde quel bouton a été activé (BP3 ou BP2)6 en le mettant dans
+	// button_data
+	// Si button_data == BP3 on :
+	// 1) affiche le LED correspondant
+	// 2) on fait un rendez unilatéral pour débloquer TaskReset via Flag (masque
+	// TASK_RESET_RDY) qui va (re)démarrer le système.
+	// Attention ne pas appeler l’ordonnanceur…
+	// Si button_data == BP2 on :
+	// 1) affiche le LED correspondant
+	// 2) on fait un rendez unilatéral pour débloquer StartupTask via flag
+	// (masque TASK_SHUTDOWN) qui va alors s’occuper d’arrêter le système
+	// Attention ne pas appeler l’ordonnanceur…
+	// On met à 0 les interruptions du GPIO avec l’aide du masque
+	// XGPIO_IR_MASK
+	xil_printf("---------------gpio_isr0---------------\n"); // dans l’ISR gpio_isr0
+}
+
+void fit_timer_isr0(void *p_int_arg, CPU_INT32U source_cpu); {
+	OS_ERR perr;
+	CPU_TS ts;
+	OS_FLAGS flags;
+	// Si Stat_Period == SWITCH1
+	//On fait le safeprintf("------------------ FIT TIMER 0 -------------------\n");
+	//On fait le rendez-vous avec TaskStop via Flag (masque // TASK_STOP_RDY)
+	//Attention ne pas appeler l’ordonnanceur…
+	xil_printf("---------------fit_timer_isr0---------------\n"); // dans l’ISR fit__isr0
+}
+
+void fit_timer_isr1(void *p_int_arg, CPU_INT32U source_cpu); {
+	OS_ERR perr;
+	CPU_TS ts;
+	OS_FLAGS flags;
+	// Si Stat_Period == SWITCH2
+	//On fait le safeprintf("------------------ FIT TIMER 1 -------------------\n");
+	//On fait le rendez-vous avec TaskStop via Flag (masque TASK_STOP_RDY)
+	//Attention ne pas appeler l’ordonnanceur…
+	xil_printf("---------------fit_timer_isr1---------------\n"); // dans l’ISR fit__isr1
+}
+void gpio_isr1(void *p_int_arg, CPU_INT32U source_cpu) {
+	CPU_TS ts;
+	OS_ERR err;
+	int switch_data = 0;
+	// N.B. Inspirez-vous du no 34 (fig. 4) pour le DiscreteRead et
+	// DiscreteWrite…
+	// On regarde quelle switch a été activée via switch_data
+	// Si switch_data == SWITCH1 on affiche le LED correspondant et la
+	// variable globale Stat_Period = SWITCH1
+	// Si switch_data == SWITCH2 on affiche le LED correspondant et la
+	// variable globale Stat_Period = SWITCH2
+	// Si switch_data == NO_STAT ou switch_data == SWITCH1and2 on affiche
+	// NO_STAT pour éteindre le LED précédent et la variable globale Stat_Period
+	// = NO_STAT
+	// On met à 0 les interruptions du GPIO avec l’aide du masque
+	// XGPIO_IR_MASK
+	xil_printf("---------------gpio_isr1---------------\n"); // dans l’ISR gpio_isr1
+
+}
 /*
+ *
  *********************************************************************************************************
  *											  TaskGeneratePacket
  *  - Génère des paquets et les envoie dans la InputQ.
@@ -231,25 +286,63 @@ void TaskReset(void* data) {
 	int i;
 	OS_FLAGS  flags;
 	while (true) {
+
+		// mettre ici le code du RDV unilatéral avec gpio_isr0 via flag (masque
+		// TASK_RESET_RDY).
+		// Attention de bien consommer afin de bloquer de nouveau la prochaine
+		// itération.
+		 xil_printf("--------------------- Task Reset --------------------\n");
+		routerIsOn = 1; // Var. globale qui indique que le système (re)démarre
+		// Réutiliez le code de la partie 1 qui fait un rendez unilatéral pour
+		// débloquer via le masque TASKS_ROUTER les tâches TaskGenerate,
+		// TaskComputing, TaskFowarding, TaskOutputPort et TaskStats
 		OSTimeDlyHMSM(0, 0, 10, 0, OS_OPT_TIME_HMSM_STRICT, &err);
 		xil_printf("--------------------- Task Reset --------------------\n");
 		flags = OSFlagPost(&RouterStatus, TASKS_ROUTER, OS_OPT_POST_FLAG_SET, &err);
 		xil_printf("--------------------- Flags: %x --------------------------\n", RouterStatus.Flags);
 		OSTaskSuspend((OS_TCB *)0,&err);
 
-		}
+	}
+	}
 	}
 
 void TaskStop(void* data){
 	CPU_TS ts;
 	OS_ERR err;
 	OS_FLAGS  flags;
-		OSSemPend(&Sem,0, OS_OPT_PEND_BLOCKING, &ts, &err);
-		// Suspend all tasks except statistics one
-		xil_printf("--------------------- Task stop suspend all tasks -------------\n");
-		flags = OSFlagPost(&RouterStatus, TASKS_ROUTER, OS_OPT_POST_FLAG_CLR, &err);
-		xil_printf("--------------------- Flags: %x ---------------------------------------\n", RouterStatus.Flags);
-		OSTaskSuspend((OS_TCB *)0,&err);
+
+		while (true) {
+			// mettre ici le code du RDV unilatéral avec fit_timer_isr0 ou
+			// fit_timer_isr1 via flag (masque TASK_STOP_RDY). Attention de bien
+			// consommer afin de bloquer de nouveau la prochaine itération…
+			if (!routerIsOn) {
+			continue ; 	 // fit_timer0 et fit_timer_1 poursuivent même
+						 // quand le système est arrêté,
+						 // mais on fait rien (voir Fig. 1)
+			}
+
+			// xil_printf("-------- Statistics & Task stop check ---------\n");
+			// Rendez unilatéral pour débloquer TaskStats via Flag
+			// (TASK_STATS_PRINT)
+			//
+			// Test sur nbPacketSourceRejete
+			// Si nbPacketSourceRejete a pas dépassé la valeur limite (350)
+			// alors 3 choses:1)
+			//		safeprintf("-------- Task stop suspend all tasks -------
+			//		\n");
+			//		2) routerIsOn = 0;
+			//		3) // Mettre le code de la partie 1 qui fera bloquer
+			OSSemPend(&Sem,0, OS_OPT_PEND_BLOCKING, &ts, &err);
+			// Suspend all tasks except statistics one
+			 // TaskGenerate, TaskComputing,
+			 // TaskFowarding,TaskOutputPort et TaskStats
+			 // via le masque TASKS_ROUTER (la manière simple de faire
+			 // est expliquée au dernier paragraphe de la section 3.2)
+			xil_printf("--------------------- Task stop suspend all tasks -------------\n");
+			flags = OSFlagPost(&RouterStatus, TASKS_ROUTER, OS_OPT_POST_FLAG_CLR, &err);
+			xil_printf("--------------------- Flags: %x ---------------------------------------\n", RouterStatus.Flags);
+			OSTaskSuspend((OS_TCB *)0,&err);
+			}
 }
 
 
@@ -578,6 +671,10 @@ void StartupTask (void *p_arg)
 
 
     UCOS_IntInit();
+    initialize_gpio0();
+    initialize_gpio1();
+    initialize_axi_intc();
+    connect_axi();
 
 #if (APP_OSIII_ENABLED == DEF_ENABLED)
     tick_rate = OS_CFG_TICK_RATE_HZ;
@@ -696,6 +793,16 @@ void StartupTask (void *p_arg)
 	}; 
 
 	OSTaskCreate(&TaskStatsTCB, "TaskStats", TaskStats, (void*)0, TaskStatsPRIO, &TaskStatsSTK[0u], TASK_STK_SIZE / 2, TASK_STK_SIZE, 1024, 0, (void*)0, (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR), &err);
+
+	UCOS_Print("Router initialized - Ready to launch - Hit push button\r\n");
+//	Mettre ici le OSFlagPend() qui bloque sur TASK_SHUTDOWN
+	UCOS_Print("Prepare to shutdown System - \r\n");
+	while (1) { // indique que le système est en arrêt permanent
+		TurnLEDButton(0b1111); // mettre 4 bits
+		OSTimeDlyHMSM(0, 0, 1, 0, OS_OPT_TIME_HMSM_STRICT, &err);
+		TurnLEDButton(0b0000);
+		OSTimeDlyHMSM(0, 0, 1, 0, OS_OPT_TIME_HMSM_STRICT, &err);
+	}
 
 	OSTaskCreate(&TaskResetTCB, "TaskReset", TaskReset, (void*)0, TaskResetPRIO, &TaskResetSTK[0u], TASK_STK_SIZE / 2, TASK_STK_SIZE, 1, 0, (void*)0, (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR), &err);
 
