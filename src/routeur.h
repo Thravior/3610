@@ -8,6 +8,7 @@
 #ifndef SRC_ROUTEUR_H_EXT_
 #define SRC_ROUTEUR_H_EXT_
 
+
 #include  <cpu.h>
 #include  <lib_mem.h>
 
@@ -84,7 +85,13 @@
 #define TASK_STATS_RDY  		0x10
 
 // Mask
-#define TASKS_ROUTER			0x1F     // Permet de demarrer ou stopper toutes les taches au meme moment
+#define TASKS_ROUTER				0x1F     // Permet de demarrer ou stopper toutes les taches au meme moment
+#define TASK_RESET_RDY  			0x20	 // Permet le rendez vous unilatéral entre gpio_isr et TaskReset quand on démarre le systeme
+#define TASK_SHUTDOWN				0x40     // Permet le rendez vous unilatéral entre gpio_isr et StartupTask quand on arrête le systeme
+#define TASK_STOP_RDY  				0x80	 // Permet le rendez vous unilatéral entre fittimer et TaskStop après 20 sec
+#define TASK_STATS_PRINT			0x100    // Permet le rendez vous unilatéral entre TaskStop et TaskStats pour imprimer
+
+
 
 OS_FLAG_GRP RouterStatus;
 
@@ -138,17 +145,6 @@ static OS_TCB TaskStopTCB;
 static OS_TCB StartupTaskTCB;
 
 
-
-// Evenements (masques) lies aux ISRs
-#define TASK_RESET_RDY  			0x20	 // Permet le rendez vous unilatéral entre gpio_isr et TaskReset quand on démarre le systeme
-#define TASK_SHUTDOWN				0x40     // Permet le rendez vous unilatéral entre gpio_isr et StartupTask quand on arrête le systeme
-#define TASK_STOP_RDY  				0x80	 // Permet le rendez vous unilatéral entre fittimer et TaskStop après 20 sec
-#define TASK_STATS_PRINT			0x100    // Permet le rendez vous unilatéral entre TaskStop et TaskStats pour imprimer
-
-
-
-
-
 /* ************************************************
  *                  Queues
  **************************************************/
@@ -170,8 +166,6 @@ OS_MUTEX mutRejete;
 OS_MUTEX mutPrint;
 OS_MUTEX mutAlloc;
 OS_MUTEX mutPrint;
-
-
 
 /* ************************************************
  *              TASK PROTOTYPES
