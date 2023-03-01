@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  * router.h
  *
  *  Created on: 26 July 2020
@@ -82,14 +82,13 @@
 #define TASK_COMPUTING_RDY  	0x02
 #define TASK_FORWARDING_RDY  	0x04
 #define TASK_OUTPUTPORT_RDY  	0x08
-#define TASK_STATS_RDY  		0x10
 
 // Mask
 #define TASKS_ROUTER				0x1F     // Permet de demarrer ou stopper toutes les taches au meme moment
-#define TASK_RESET_RDY  			0x20	 // Permet le rendez vous unilatéral entre gpio_isr et TaskReset quand on démarre le systeme
-#define TASK_SHUTDOWN				0x40     // Permet le rendez vous unilatéral entre gpio_isr et StartupTask quand on arrête le systeme
-#define TASK_STOP_RDY  				0x80	 // Permet le rendez vous unilatéral entre fittimer et TaskStop après 20 sec
-#define TASK_STATS_PRINT			0x100    // Permet le rendez vous unilatéral entre TaskStop et TaskStats pour imprimer
+#define TASK_RESET_RDY  			0x20	 // Permet le rendez vous unilatï¿½ral entre gpio_isr et TaskReset quand on dï¿½marre le systeme
+#define TASK_SHUTDOWN				0x40     // Permet le rendez vous unilatï¿½ral entre gpio_isr et StartupTask quand on arrï¿½te le systeme
+#define TASK_STOP_RDY  				0x80	 // Permet le rendez vous unilatï¿½ral entre fittimer et TaskStop aprï¿½s 20 sec
+#define TASK_STATS_PRINT			0x100    // Permet le rendez vous unilatï¿½ral entre TaskStop et TaskStats pour imprimer
 
 
 

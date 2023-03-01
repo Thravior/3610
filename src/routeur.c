@@ -39,12 +39,12 @@ int Stat_Period= 0;
 
 // À utiliser pour suivre le remplissage et le vidage des fifos
 // Mettre en commentaire et utiliser la fonction vide suivante si vous ne voulez pas de trace
-/*	#define safeprintf(fmt, ...)															\
-{																						\
-	OSMutexPend(&mutPrint, 0, OS_OPT_PEND_BLOCKING, &ts, &perr);						\
-	xil_printf(fmt, ##__VA_ARGS__);														\
-	OSMutexPost(&mutPrint, OS_OPT_POST_NONE, &perr);									\
-}*/
+//	#define safeprintf(fmt, ...)															\
+//{																						\
+//	OSMutexPend(&mutPrint, 0, OS_OPT_PEND_BLOCKING, &ts, &perr);						\
+//	xil_printf(fmt, ##__VA_ARGS__);														\
+//	OSMutexPost(&mutPrint, OS_OPT_POST_NONE, &perr);									\
+//}
 // À utiliser pour ne pas avoir les traces de remplissage et de vidage des fifos
 #define safeprintf(fmt, ...)															\
 {																						\
@@ -195,7 +195,7 @@ void gpio_isr1(void *p_int_arg, CPU_INT32U source_cpu) {
  *********************************************************************************************************
  */
 void TaskGenerate(void *data) {
-	srand(41);
+	srand(42);
 	OS_ERR err, perr;
 	CPU_TS ts;
 	bool isGenPhase = false; 		//Indique si on est dans la phase de generation ou non
@@ -260,6 +260,7 @@ void TaskGenerate(void *data) {
 			do { packGenQty = (rand() %255); } while (packGenQty == 0);
 
 		safeprintf("\n***** RAFALE No %d DE %d PAQUETS DURANT LES %d PROCHAINES MILLISECONDES\n\n", ++nb_rafales, packGenQty, packGenQty);
+//		xil_printf("\n***** RAFALE No %d DE %d PAQUETS DURANT LES %d PROCHAINES MILLISECONDES\n\n", ++nb_rafales, packGenQty, packGenQty);
 
 		}
 	}
@@ -275,22 +276,21 @@ void TaskGenerate(void *data) {
  */
 void TaskReset(void* data) {
 	CPU_TS ts;
-	OS_ERR err;
+	OS_ERR err, perr;
 	int i;
 	OS_FLAGS  flags;
 	while (true) {
 		OSFlagPend(&RouterStatus, TASK_RESET_RDY, 0, OS_OPT_PEND_FLAG_SET_ALL + OS_OPT_PEND_BLOCKING + OS_OPT_PEND_FLAG_CONSUME, &ts, &err);
 		routerIsOn = 1;
-		xil_printf("--------------------- Task Reset --------------------\n");
+		safeprintf("--------------------- Task Reset --------------------\n");
 		flags = OSFlagPost(&RouterStatus, TASKS_ROUTER, OS_OPT_POST_FLAG_SET, &err);
-		xil_printf("--------------------- Flags: %x --------------------------\n", RouterStatus.Flags);
-		OSTaskSuspend((OS_TCB *)0,&err);
+		safeprintf("--------------------- Flags: %x --------------------------\n", RouterStatus.Flags);
 		}
 	}
 
 void TaskStop(void* data){
 	CPU_TS ts;
-	OS_ERR err;
+	OS_ERR err, perr;
 	OS_FLAGS  flags;
 	while (true) {
 		OSFlagPend(&RouterStatus, TASK_STOP_RDY, 0, OS_OPT_PEND_FLAG_SET_ALL + OS_OPT_PEND_BLOCKING + OS_OPT_PEND_FLAG_CONSUME, &ts, &err);
@@ -299,7 +299,7 @@ void TaskStop(void* data){
 			continue;
 		}
 
-		xil_printf("-------- Statistics & Task stop check ---------\n");
+		safeprintf("-------- Statistics & Task stop check ---------\n");
 
 		flags = OSFlagPost(&RouterStatus, TASK_STATS_PRINT, OS_OPT_POST_FLAG_SET, &err);
 
@@ -307,7 +307,7 @@ void TaskStop(void* data){
 			safeprintf("--------------------- Task stop suspend all tasks -------------\n");
 			routerIsOn = 0;
 			flags = OSFlagPost(&RouterStatus, TASKS_ROUTER, OS_OPT_POST_FLAG_CLR, &err);
-			xil_printf("--------------------- Flags: %x ---------------------------------------\n", RouterStatus.Flags);
+			safeprintf("--------------------- Flags: %x ---------------------------------------\n", RouterStatus.Flags);
 			OSTaskSuspend((OS_TCB *)0,&err);
 		}
 	}
@@ -543,7 +543,7 @@ void TaskOutputPort(void *data) {
 
 	while (1) {
 
-		OSFlagPend(&RouterStatus, TASK_STATS_RDY, 0, OS_OPT_PEND_FLAG_SET_ALL + OS_OPT_PEND_BLOCKING, &ts, &err);
+		OSFlagPend(&RouterStatus, TASK_STATS_PRINT, 0, OS_OPT_PEND_FLAG_SET_ALL + OS_OPT_PEND_BLOCKING + OS_OPT_PEND_FLAG_CONSUME, &ts, &err);
 
 		OSMutexPend(&mutPrint, 0, OS_OPT_PEND_BLOCKING, &ts, &err);
 
@@ -603,10 +603,6 @@ void TaskOutputPort(void *data) {
 		nbPacketSourceRejete = 0;
 
 		if (nbPacketCrees > limite_de_paquets)  OSSemPost(&Sem,  OS_OPT_POST_1 + OS_OPT_POST_NO_SCHED, &err);
-
-		OSTimeDlyHMSM(0, 0, 30, 0, OS_OPT_TIME_HMSM_STRICT, &err);
-
-
 	}
 }
 
@@ -770,7 +766,8 @@ void StartupTask (void *p_arg)
     UCOS_Print("Router initialized - Ready to launch - Hit push button\r\n");
 	CPU_TS ts;
 	OSFlagPend(&RouterStatus, TASK_SHUTDOWN, 0, OS_OPT_PEND_FLAG_SET_ALL + OS_OPT_PEND_BLOCKING, &ts, &err);
-
+	routerIsOn = 0;
+	OSTaskSuspend(&TaskGenerateTCB,&err);
 	UCOS_Print("Prepare to shutdown System - \r\n");
     while (1) { // indique que le système est en arrêt permanent
 		TurnLEDButton(0b1111); // mettre 4 bits
