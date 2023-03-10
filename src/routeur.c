@@ -28,13 +28,13 @@ int nbPacketSourceRejete = 0;						// Nb de packets rejete pour mauvaise source 
 int packet_rejete_fifo_pleine_inputQ = 0;			// Utilisation de la fifo d'entrÃ©e
 int packet_rejete_output_port_plein = 0;			// Utilisation des MB
 int packet_rejete_fifo_pleine_Q = 0;
-int delai_pour_vider_les_fifos_sec = 5;
+int delai_pour_vider_les_fifos_sec = 2;
 int delai_pour_vider_les_fifos_msec = 0;
 int print_paquets_rejetes = 0;
 int limite_de_paquets= 30;
 int limite_rejet = 350;
 int routerIsOn= 0;
-int Stat_Period= 0;
+int stat_Period= 0;
 
 
 // À utiliser pour suivre le remplissage et le vidage des fifos
@@ -148,7 +148,7 @@ void fit_timer_isr0(void *p_int_arg, CPU_INT32U source_cpu) {
 	OS_ERR err;
 	CPU_TS ts;
 	OS_FLAGS flags;
-	if (Stat_Period == SWITCH1) {
+	if (stat_Period == SWITCH1) {
 		flags = OSFlagPost(&RouterStatus, TASK_STOP_RDY, OS_OPT_POST_FLAG_SET +
 		OS_OPT_POST_NO_SCHED, &err);
 	}
@@ -158,7 +158,7 @@ void fit_timer_isr1(void *p_int_arg, CPU_INT32U source_cpu) {
 	OS_ERR err;
 	CPU_TS ts;
 	OS_FLAGS flags;
-	if (Stat_Period == SWITCH2) {
+	if (stat_Period == SWITCH2) {
 		flags = OSFlagPost(&RouterStatus, TASK_STOP_RDY, OS_OPT_POST_FLAG_SET +
 		OS_OPT_POST_NO_SCHED, &err);
 	}
@@ -175,7 +175,7 @@ void gpio_isr1(void *p_int_arg, CPU_INT32U source_cpu) {
 		switch_data = NO_STAT;
 	}
 
-	Stat_Period = switch_data;
+	stat_Period = switch_data;
 	TurnLEDSwitch(switch_data);
 
 	XGpio_InterruptClear(&gpSwitch, XGPIO_IR_MASK);
@@ -224,12 +224,12 @@ void TaskGenerate(void *data) {
 			/*impression des infos du paquets pour verification, voir à la ligne 405*/
 
 			OSMutexPend(&mutPrint, 0, OS_OPT_PEND_BLOCKING, &ts, &perr);
-			xil_printf("\nTaskGenerate : ********Generation du Paquet # %d ******** \n", nbPacketCrees);
-			xil_printf("ADD %x \n", packet);
-			xil_printf("	** id : %d \n", packet->data[0]);
-			xil_printf("	** src : %x \n", packet->src);
-			xil_printf("	** dst : %x \n", packet->dst);
-			xil_printf("	** type : %d \n", packet->type);
+//			xil_printf("\nTaskGenerate : ********Generation du Paquet # %d ******** \n", nbPacketCrees);
+//			xil_printf("ADD %x \n", packet);
+//			xil_printf("	** id : %d \n", packet->data[0]);
+//			xil_printf("	** src : %x \n", packet->src);
+//			xil_printf("	** dst : %x \n", packet->dst);
+//			xil_printf("	** type : %d \n", packet->type);
 			OSMutexPost(&mutPrint, OS_OPT_POST_NONE, &perr);
 
 			OSTaskQPost(&TaskComputingTCB, packet, sizeof(packet), OS_OPT_POST_FIFO + OS_OPT_POST_NO_SCHED, &err);
@@ -567,6 +567,18 @@ void TaskOutputPort(void *data) {
 		xil_printf("12- Message free : %d \n", OSMsgPool.NbrFree);
 		xil_printf("13- Message used : %d \n", OSMsgPool.NbrUsed);
 		xil_printf("14- Message used max : %d \n", OSMsgPool.NbrUsedMax);
+
+        if (stat_Period == SWITCH1    ) {
+
+            xil_printf("15- Frequence des stats de 20 sec :\n");
+
+        };
+
+        if (stat_Period == SWITCH2    ) {
+
+            xil_printf("15- Frequence des stats de 10.000005 sec :\n");
+
+        };
 
 		OSMutexPost(&mutPrint, OS_OPT_POST_NONE, &err);
 
